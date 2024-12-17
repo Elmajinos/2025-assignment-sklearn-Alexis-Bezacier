@@ -16,7 +16,8 @@ number of samples corectly classified). You need to implement the `fit`,
 the test we implemented. You can run the tests by calling at the root of the
 repo `pytest test_sklearn_questions.py`. Note that to be fully valid, a
 scikit-learn estimator needs to check that the input given to `fit` and
-`predict` are correct using the `check_*` functions imported in the file.
+`predict` are correct using the `validate_data, check_is_fitted` functions
+imported in this file.
 You can find more information on how they should be used in the following doc:
 https://scikit-learn.org/stable/developers/develop.html#rolling-your-own-estimator.
 Make sure to use them to pass `test_nearest_neighbor_check_estimator`.
@@ -55,9 +56,8 @@ from sklearn.base import ClassifierMixin
 
 from sklearn.model_selection import BaseCrossValidator
 
-from sklearn.utils.validation import check_X_y, check_is_fitted
-from sklearn.utils.validation import check_array
-from sklearn.utils.multiclass import check_classification_targets
+from sklearn.utils.validation import check_is_fitted
+from sklearn.utils.validation import validate_data
 from sklearn.metrics.pairwise import pairwise_distances
 
 
