@@ -50,6 +50,7 @@ to compute distances between 2 sets of samples.
 """
 import numpy as np
 import pandas as pd
+from collections import Counter
 
 from sklearn.base import BaseEstimator
 from sklearn.base import ClassifierMixin
@@ -57,7 +58,9 @@ from sklearn.base import ClassifierMixin
 from sklearn.model_selection import BaseCrossValidator
 
 from sklearn.utils.validation import check_is_fitted
+from sklearn.utils.validation import check_X_y
 from sklearn.utils.validation import validate_data
+from sklearn.utils.multiclass import type_of_target
 from sklearn.metrics.pairwise import pairwise_distances
 
 
@@ -82,6 +85,21 @@ class KNearestNeighbors(ClassifierMixin, BaseEstimator):
         self : instance of KNearestNeighbors
             The current instance of the classifier
         """
+        X, y = check_X_y(X, y)
+        
+        # Check that y is a valid classification target
+        target_type = type_of_target(y)
+        if target_type == 'continuous':
+            raise ValueError(
+                "Unknown label type: KNearestNeighbors does not support "
+                "continuous targets. Please provide discrete class labels."
+            )
+        
+        self.X_ = X
+        self.y_ = y
+        self.classes_ = np.unique(y)
+        self.n_features_in_ = X.shape[1]
+
         return self
 
     def predict(self, X):
@@ -97,8 +115,22 @@ class KNearestNeighbors(ClassifierMixin, BaseEstimator):
         y : ndarray, shape (n_test_samples,)
             Predicted class labels for each test data sample.
         """
-        y_pred = np.zeros(X.shape[0])
-        return y_pred
+        check_is_fitted(self)
+        X = validate_data(self, X, reset=False)
+        y_pred = []
+
+        for i in range(X.shape[0]):
+            distances = []
+            for j in range(self.X_.shape[0]):
+                dist = np.sqrt(np.sum((X[i] - self.X_[j])**2))
+                distances.append((dist, self.y_[j]))
+            distances.sort(key=lambda x: x[0])
+            k_nearest = distances[:self.n_neighbors]
+            k_nearest_labels = [label for _, label in k_nearest]
+            most_common = Counter(k_nearest_labels).most_common(1)
+            y_pred.append(most_common[0][0])
+
+        return np.array(y_pred)
 
     def score(self, X, y):
         """Calculate the score of the prediction.
@@ -108,14 +140,16 @@ class KNearestNeighbors(ClassifierMixin, BaseEstimator):
         X : ndarray, shape (n_samples, n_features)
             Data to score on.
         y : ndarray, shape (n_samples,)
-            target values.
+            target values. 
 
         Returns
         ----------
         score : float
             Accuracy of the model computed for the (X, y) pairs.
         """
-        return 0.
+        y_pred = self.predict(X)
+        accuracy = (y_pred == y).mean() 
+        return accuracy
 
 
 class MonthlySplit(BaseCrossValidator):
@@ -139,6 +173,7 @@ class MonthlySplit(BaseCrossValidator):
 
     def get_n_splits(self, X, y=None, groups=None):
         """Return the number of splitting iterations in the cross-validator.
+        
 
         Parameters
         ----------
@@ -155,7 +190,17 @@ class MonthlySplit(BaseCrossValidator):
         n_splits : int
             The number of splits.
         """
-        return 0
+        if self.time_col == 'index':
+            dates = pd.Series(X.index)
+        else:
+            dates = X[self.time_col]
+        
+
+        if not pd.api.types.is_datetime64_any_dtype(dates):
+             return 0 
+             
+        unique_periods = dates.dt.to_period('M').unique()
+        return len(unique_periods) - 1
 
     def split(self, X, y, groups=None):
         """Generate indices to split data into training and test set.
@@ -177,12 +222,24 @@ class MonthlySplit(BaseCrossValidator):
         idx_test : ndarray
             The testing set indices for that split.
         """
+        if self.time_col == 'index':
+            dates = pd.Series(X.index)
+        else:
+            dates = X[self.time_col]
 
-        n_samples = X.shape[0]
-        n_splits = self.get_n_splits(X, y, groups)
+        if not pd.api.types.is_datetime64_any_dtype(dates):
+            raise ValueError(f"La colonne {self.time_col} n'est pas de type datetime.")
+
+        periods = dates.dt.to_period('M')
+        unique_periods = np.sort(periods.unique())
+
+        n_splits = len(unique_periods) - 1
+
         for i in range(n_splits):
-            idx_train = range(n_samples)
-            idx_test = range(n_samples)
-            yield (
-                idx_train, idx_test
-            )
+            train_month = unique_periods[i]
+            test_month = unique_periods[i+1]
+
+            idx_train = np.where(periods == train_month)[0]
+            idx_test = np.where(periods == test_month)[0]
+
+            yield idx_train, idx_test
