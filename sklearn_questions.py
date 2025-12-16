@@ -61,7 +61,6 @@ from sklearn.utils.validation import check_is_fitted
 from sklearn.utils.validation import check_X_y
 from sklearn.utils.validation import validate_data
 from sklearn.utils.multiclass import type_of_target
-from sklearn.metrics.pairwise import pairwise_distances
 
 
 class KNearestNeighbors(ClassifierMixin, BaseEstimator):
@@ -86,15 +85,14 @@ class KNearestNeighbors(ClassifierMixin, BaseEstimator):
             The current instance of the classifier
         """
         X, y = check_X_y(X, y)
-        
-        # Check that y is a valid classification target
+
         target_type = type_of_target(y)
         if target_type == 'continuous':
             raise ValueError(
                 "Unknown label type: KNearestNeighbors does not support "
                 "continuous targets. Please provide discrete class labels."
             )
-        
+
         self.X_ = X
         self.y_ = y
         self.classes_ = np.unique(y)
@@ -140,7 +138,7 @@ class KNearestNeighbors(ClassifierMixin, BaseEstimator):
         X : ndarray, shape (n_samples, n_features)
             Data to score on.
         y : ndarray, shape (n_samples,)
-            target values. 
+            target values.
 
         Returns
         ----------
@@ -148,7 +146,7 @@ class KNearestNeighbors(ClassifierMixin, BaseEstimator):
             Accuracy of the model computed for the (X, y) pairs.
         """
         y_pred = self.predict(X)
-        accuracy = (y_pred == y).mean() 
+        accuracy = (y_pred == y).mean()
         return accuracy
 
 
@@ -173,7 +171,6 @@ class MonthlySplit(BaseCrossValidator):
 
     def get_n_splits(self, X, y=None, groups=None):
         """Return the number of splitting iterations in the cross-validator.
-        
 
         Parameters
         ----------
@@ -194,11 +191,10 @@ class MonthlySplit(BaseCrossValidator):
             dates = pd.Series(X.index)
         else:
             dates = X[self.time_col]
-        
 
         if not pd.api.types.is_datetime64_any_dtype(dates):
-             return 0 
-             
+            return 0
+
         unique_periods = dates.dt.to_period('M').unique()
         return len(unique_periods) - 1
 
@@ -228,7 +224,9 @@ class MonthlySplit(BaseCrossValidator):
             dates = X[self.time_col]
 
         if not pd.api.types.is_datetime64_any_dtype(dates):
-            raise ValueError(f"La colonne {self.time_col} n'est pas de type datetime.")
+            raise ValueError(
+                f"La colonne {self.time_col} n'est pas de type datetime."
+            )
 
         periods = dates.dt.to_period('M')
         unique_periods = np.sort(periods.unique())
